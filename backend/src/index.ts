@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { fetchPubMedAbstracts, buildContextBlock } from './pubmed';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
@@ -15,19 +16,19 @@ interface OpenRouterResponse {
   choices: Array<{ message: { content: string } }>;
 }
 
-const SEARCH_SYSTEM_PROMPT = `You are a fitness science research assistant. Given a topic, return ONLY a valid JSON object with no markdown code fences, no preamble, and no explanation. The JSON must exactly match this structure:
+const SEARCH_SYSTEM_PROMPT = `You are a fitness science research assistant. Given a topic and retrieved PubMed literature, return ONLY a valid JSON object with no markdown code fences, no preamble, and no explanation. The JSON must exactly match this structure:
 
 {
   "topic": "string",
-  "summary": "string (2-3 sentences in plain language summarizing the research)",
+  "summary": "string (2-3 sentences grounded in the retrieved abstracts — be specific: cite effect sizes, sample sizes, and methodologies where available)",
   "consensus": "strong | mixed | debate",
-  "consensusNote": "string (one sentence describing the current state of the evidence)",
+  "consensusNote": "string (one sentence describing the current state of evidence based on the retrieved literature)",
   "perspectives": [
-    { "label": "string (short label for this view)", "side": "for", "text": "string (1-2 sentences supporting the dominant view)" },
-    { "label": "string (short label for this view)", "side": "against", "text": "string (1-2 sentences challenging the dominant view)" }
+    { "label": "string (short label for this view)", "side": "for", "text": "string (1-2 sentences with specific findings from the literature)" },
+    { "label": "string (short label for this view)", "side": "against", "text": "string (1-2 sentences with specific findings or limitations from the literature)" }
   ],
   "studies": [
-    { "title": "string (author names + year + short title)", "url": "string (real PubMed or Semantic Scholar URL)" },
+    { "title": "string (AuthorLastName et al., Year — brief title)", "url": "string" },
     { "title": "string", "url": "string" },
     { "title": "string", "url": "string" }
   ]
@@ -36,7 +37,8 @@ const SEARCH_SYSTEM_PROMPT = `You are a fitness science research assistant. Give
 Rules:
 - "consensus" must be exactly one of: "strong", "mixed", or "debate"
 - "perspectives" must have exactly 2 items — one with side "for", one with side "against"
-- "studies" must have exactly 3 items with plausible PubMed (https://pubmed.ncbi.nlm.nih.gov/PMID) or Semantic Scholar URLs
+- "studies" must have exactly 3 items. PREFER PMIDs from the retrieved literature above — use the exact PMID to construct the URL as https://pubmed.ncbi.nlm.nih.gov/<PMID>/. If fewer than 3 were retrieved, supplement with additional real PubMed citations.
+- Base the summary, consensus, and perspectives on the retrieved abstracts. Do not contradict findings in the provided literature.
 - Return ONLY the raw JSON object. No markdown, no code fences, no extra text.`;
 
 const CHAT_SYSTEM_PROMPT = `You are SimpleBL, an evidence-based fitness assistant for lifters of all levels.
@@ -44,34 +46,33 @@ const CHAT_SYSTEM_PROMPT = `You are SimpleBL, an evidence-based fitness assistan
 Guidelines:
 - Keep responses to 3-5 sentences — concise and research-grounded
 - When studies conflict, present both sides and defer the judgment to the user
-- Cite studies inline as [Author et al., Year](https://pubmed.ncbi.nlm.nih.gov/PMID) where possible
+- Cite studies inline as [Author et al., Year](https://pubmed.ncbi.nlm.nih.gov/PMID) — use exact PMIDs from the retrieved literature above when available
+- Be specific: reference sample sizes, effect sizes, and study designs when the retrieved abstracts provide them
 - Never present contested topics as settled science
-- Be accessible to beginners and advanced lifters alike
-- Cover: strength/powerlifting, hypertrophy, nutrition/supplementation, recovery, and injury prevention`;
+- Do not fabricate study findings — if the retrieved abstracts do not cover part of the question, say so
+- Be accessible to beginners and advanced lifters alike`;
 
-async function callOpenRouter(
+async function callLLM(
   messages: Array<{ role: string; content: string }>
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY is not set');
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://simplebl.app',
-      'X-Title': 'SimpleBL',
     },
     body: JSON.stringify({
-      model: 'meta-llama/llama-3.3-70b-instruct:free',
+      model: 'llama-3.3-70b-versatile',
       messages,
     }),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter ${response.status}: ${errorText}`);
+    const text = await response.text();
+    throw new Error(`Groq ${response.status}: ${text}`);
   }
 
   const data = (await response.json()) as OpenRouterResponse;
@@ -86,10 +87,20 @@ app.post('/api/search', async (req: Request, res: Response) => {
     return;
   }
 
+  const trimmed = query.trim();
+
+  // Fetch real PubMed abstracts — never throws, returns [] on failure
+  const abstracts = await fetchPubMedAbstracts(trimmed);
+  const contextBlock = buildContextBlock(abstracts);
+
+  const systemPrompt = contextBlock
+    ? `${contextBlock}\n\n${SEARCH_SYSTEM_PROMPT}`
+    : SEARCH_SYSTEM_PROMPT;
+
   try {
-    const text = await callOpenRouter([
-      { role: 'system', content: SEARCH_SYSTEM_PROMPT },
-      { role: 'user', content: query.trim() },
+    const text = await callLLM([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: trimmed },
     ]);
 
     // Strip accidental markdown code fences before parsing
@@ -121,9 +132,19 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     return;
   }
 
+  // Search PubMed based on the most recent user message
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+  console.log(`[chat] last user message: "${lastUserMsg?.content.slice(0, 80)}"`);
+  const abstracts = lastUserMsg ? await fetchPubMedAbstracts(lastUserMsg.content) : [];
+  const contextBlock = buildContextBlock(abstracts);
+
+  const systemPrompt = contextBlock
+    ? `${contextBlock}\n\n${CHAT_SYSTEM_PROMPT}`
+    : CHAT_SYSTEM_PROMPT;
+
   try {
-    const reply = await callOpenRouter([
-      { role: 'system', content: CHAT_SYSTEM_PROMPT },
+    const reply = await callLLM([
+      { role: 'system', content: systemPrompt },
       ...messages,
     ]);
     res.json({ reply });
