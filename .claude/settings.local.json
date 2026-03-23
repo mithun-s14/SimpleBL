@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(source \"/Users/mithunsivapathasundram/Desktop/Resume Projects/SimpleBL/.env\")",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models\" -H \"Authorization: Bearer $OPENROUTER_API_KEY\")"
+    ]
+  }
+}
