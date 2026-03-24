@@ -10,7 +10,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('search');
 
   return (
-    <div className="min-h-screen bg-[#f0f4f2]">
+    <div className="min-h-screen bg-white">
       <div className="max-w-content mx-auto px-4 py-8 sm:py-10">
         <Header />
         <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
