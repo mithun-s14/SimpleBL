@@ -110,7 +110,13 @@ app.post('/api/search', async (req: Request, res: Response) => {
       .replace(/\s*```$/i, '')
       .trim();
 
-    const result = JSON.parse(cleaned);
+    // Escape literal control characters inside JSON string values
+    const sanitized = cleaned.replace(
+      /"(?:[^"\\]|\\.)*"/g,
+      (match) => match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+    );
+
+    const result = JSON.parse(sanitized);
     res.json(result);
   } catch (err) {
     console.error('[/api/search]', err);
