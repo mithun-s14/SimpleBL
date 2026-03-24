@@ -63,16 +63,18 @@ export default function ResultCard({ result }: ResultCardProps) {
       </div>
 
       {/* Studies */}
-      <div>
-        <h3 className="text-[10px] font-semibold font-mono uppercase tracking-widest text-gray-400 mb-2.5">
-          Studies
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {result.studies.map((study, i) => (
-            <StudyLink key={i} study={study} />
-          ))}
+      {result.studies.length > 0 && (
+        <div>
+          <h3 className="text-[10px] font-semibold font-mono uppercase tracking-widest text-gray-400 mb-2.5">
+            Studies
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {result.studies.map((study, i) => (
+              <StudyLink key={i} study={study} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
