@@ -9,8 +9,8 @@ const TOPICS = [
   'Nutrition',
   'Recovery',
   'Creatine',
-  'Injury Prevention',
   'Cardio',
+  'Carbohydrates',
 ];
 
 function SearchSkeleton() {
