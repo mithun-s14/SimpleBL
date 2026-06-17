@@ -3,17 +3,17 @@
     {
       "id": "case-001",
       "question": "Does creatine supplementation increase muscle strength and power output?",
-      "relevantPmids": []
+      "relevantPmids": [34199588, 11828245, 28190980, 42280321, 17685691, 11842271, 19387397, 33214000]
     },
     {
       "id": "case-002",
-      "question": "What is the optimal daily protein intake for muscle hypertrophy?",
-      "relevantPmids": []
+      "question": "What is the optimal protein intake for hypertrophy?",
+      "relevantPmids": [29332899, 19767798, 22873835, 37801645]
     },
     {
       "id": "case-003",
       "question": "Does caffeine improve endurance performance and at what dose?",
-      "relevantPmids": []
+      "relevantPmids": [11583104, 36615805, 28919842, 33668219, 34503527]
     }
   ]
 }

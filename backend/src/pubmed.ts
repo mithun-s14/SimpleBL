@@ -17,6 +17,9 @@ const STOP_WORDS = new Set([
   'been', 'being', 'have', 'has', 'had', 'it', 'this', 'that', 'these', 'those',
   'if', 'then', 'than', 'so', 'as', 'up', 'out', 'about', 'into', 'per',
   'get', 'make', 'need', 'want', 'use', 'know', 'think', 'try', 'me', 'we',
+  // Vague qualifiers that add noise without search signal
+  'optimal', 'best', 'good', 'ideal', 'better', 'effective', 'important',
+  'increase', 'improve', 'affect', 'impact', 'effect', 'benefit',
 ]);
 
 // Strip conversational language down to PubMed-friendly keywords
@@ -70,8 +73,8 @@ async function fetchWithRetry(url: string, retries = 1, delayMs = 400): Promise<
   }
 }
 
-async function esearch(query: string): Promise<string[]> {
-  const term = encodeURIComponent(enhanceQuery(query));
+async function esearch(pubmedQuery: string): Promise<string[]> {
+  const term = encodeURIComponent(pubmedQuery);
   const url = `${EUTILS}/esearch.fcgi?db=pubmed&term=${term}&retmax=8&retmode=json&sort=relevance&${TOOL_PARAMS}`;
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`esearch ${res.status}`);
@@ -141,7 +144,7 @@ Abstract: ${a.abstract}`
 export async function fetchPubMedAbstracts(query: string): Promise<PubMedAbstract[]> {
   console.log(`[pubmed] searching for: "${query.slice(0, 80)}"`);
   try {
-    const pmids = await esearch(query);
+    const pmids = await esearch(enhanceQuery(query));
     console.log(`[pubmed] esearch returned ${pmids.length} PMIDs:`, pmids);
     if (pmids.length === 0) return [];
 

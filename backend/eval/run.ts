@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   for (const evalCase of cases) {
     console.log(`[${evalCase.id}] ${evalCase.question}`);
 
-    const relevantSet = new Set(evalCase.relevantPmids);
+    const relevantSet = new Set(evalCase.relevantPmids.map(String));
 
     // Time only the app pipeline, not the faithfulness judge
     const start = Date.now();
