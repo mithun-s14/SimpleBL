@@ -7,7 +7,6 @@ An evidence-based fitness research assistant that surfaces peer-reviewed literat
 ## What It Does
 
 - **Literature Search** — Enter any fitness or training topic to get a structured breakdown: plain-language summary, consensus classification, contrasting perspectives, and direct links to the underlying studies.
-- **AI Chat** — Ask follow-up questions in a conversational interface. The assistant retrieves relevant PubMed abstracts in real time and cites them inline.
 - **Inline Citations** — Every claim links back to a specific PubMed article so you can verify it yourself.
 - **Honest Uncertainty** — Topics are classified as *Strong Consensus*, *Mixed Evidence*, or *Active Debate* rather than flattening contested science into false confidence.
 
@@ -35,18 +34,15 @@ SimpleBL/
 │       └── pubmed.ts       # PubMed esearch/efetch integration
 ├── frontend/
 │   └── src/
-│       ├── App.tsx         # Root component, tab routing
+│       ├── App.tsx         # Root component
 │       ├── types/          # Shared TypeScript interfaces
 │       └── components/
 │           ├── Header.tsx
-│           ├── TabBar.tsx
 │           ├── SearchPanel.tsx
 │           ├── TopicChip.tsx
 │           ├── ResultCard.tsx
 │           ├── PerspectiveBlock.tsx
-│           ├── StudyLink.tsx
-│           ├── ChatPanel.tsx
-│           └── ChatMessage.tsx
+│           └── StudyLink.tsx
 ├── .env.example
 ├── package.json            # Root workspace scripts
 └── PRD.MD                  # Product requirements document
@@ -136,17 +132,6 @@ User query (SearchPanel)
     → Render ResultCard with badges and citation pills
 ```
 
-### Chat
-
-```
-User message (ChatPanel)
-    → POST /api/chat
-    → PubMed: search based on latest message
-    → Groq LLM: full conversation history + abstract context
-    ← Plain-text reply with inline [Author et al.](PubMed URL) citations
-    → Parse markdown links into styled citation pills
-```
-
 ---
 
 ## API Endpoints
@@ -179,24 +164,6 @@ User message (ChatPanel)
 
 ---
 
-### `POST /api/chat`
-
-**Body:**
-```json
-{
-  "messages": [
-    { "role": "user", "content": "Is creatine effective for strength?" }
-  ]
-}
-```
-
-**Response:**
-```json
-{ "reply": "Yes, creatine monohydrate is one of the most well-supported supplements..." }
-```
-
----
-
 ## How PubMed Integration Works
 
 `backend/src/pubmed.ts` queries the NCBI E-utilities API in two steps:
@@ -215,14 +182,11 @@ A 340ms delay is added between requests to respect NCBI's rate limit of 3 reques
 | Component | Role |
 |---|---|
 | `Header` | Logo and tagline |
-| `TabBar` | Switches between Search and Chat |
 | `SearchPanel` | Query input, topic chips, result rendering, loading skeleton |
 | `TopicChip` | Preset query buttons (e.g., "Creatine", "Sleep & Recovery") |
 | `ResultCard` | Full structured result with badge, summary, perspectives, citations |
 | `PerspectiveBlock` | Color-coded "for" (green) / "against" (coral) argument blocks |
 | `StudyLink` | Citation pill with external PubMed link |
-| `ChatPanel` | Conversational interface with typing indicator and auto-scroll |
-| `ChatMessage` | Individual message bubble (user = green, bot = white) |
 
 ---
 
@@ -238,7 +202,6 @@ A 340ms delay is added between requests to respect NCBI's rate limit of 3 reques
 ## Design Decisions
 
 - **No vector DB or caching** — PubMed is queried live on every request to keep results current. Latency is acceptable for this use case.
-- **Session-only chat history** — Conversation state is held in React component state; there is no server-side session or localStorage persistence in v1.
 - **Groq over OpenAI** — Chosen for lower latency and cost with the `llama-3.3-70b-versatile` model.
 - **Structured JSON for search** — The LLM returns a strict schema for the search endpoint, validated and parsed by the backend before sending to the client. Markdown code fences are stripped before `JSON.parse`.
 - **Honest uncertainty over false confidence** — Topics with contested evidence are labeled as such rather than picking a side.

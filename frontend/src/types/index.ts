@@ -20,8 +20,3 @@ export interface SearchResult {
   perspectives: Perspective[];
   studies: Study[];
 }
-
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}

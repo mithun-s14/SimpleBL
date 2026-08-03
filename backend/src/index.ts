@@ -37,17 +37,6 @@ Rules:
 - Base the summary, consensus, and perspectives on the retrieved abstracts. Do not contradict findings in the provided literature.
 - Return ONLY the raw JSON object. No markdown, no code fences, no extra text.`;
 
-const CHAT_SYSTEM_PROMPT = `You are SimpleBL, an evidence-based fitness assistant for lifters of all levels.
-
-Guidelines:
-- Keep responses to 3-5 sentences — concise and research-grounded
-- When studies conflict, present both sides and defer the judgment to the user
-- Cite studies inline using bracket reference numbers matching the retrieved literature above, e.g. "...increases hypertrophy [1]." Do not write out URLs or author names yourself — just the bracket number. If no literature was retrieved, do not include any citation brackets at all
-- Be specific: reference sample sizes, effect sizes, and study designs when the retrieved abstracts provide them
-- Never present contested topics as settled science
-- Do not fabricate study findings — if the retrieved abstracts do not cover part of the question, say so
-- Be accessible to beginners and advanced lifters alike`;
-
 async function callLLM(
   messages: Array<{ role: string; content: string }>
 ): Promise<string> {
@@ -139,48 +128,6 @@ app.post('/api/search', async (req: Request, res: Response) => {
     } else {
       res.status(500).json({ error: 'Could not load results. Please try again.' });
     }
-  }
-});
-
-app.post('/api/chat', async (req: Request, res: Response) => {
-  const { messages } = req.body as {
-    messages?: Array<{ role: string; content: string }>;
-  };
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    res.status(400).json({ error: 'messages array is required' });
-    return;
-  }
-
-  // Search PubMed based on the most recent user message
-  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-  console.log(`[chat] last user message: "${lastUserMsg?.content.slice(0, 80)}"`);
-  const abstracts = lastUserMsg ? await fetchPubMedAbstracts(lastUserMsg.content) : [];
-  const contextBlock = buildContextBlock(abstracts);
-
-  const systemPrompt = contextBlock
-    ? `${contextBlock}\n\n${CHAT_SYSTEM_PROMPT}`
-    : CHAT_SYSTEM_PROMPT;
-
-  try {
-    const rawReply = await callLLM([
-      { role: 'system', content: systemPrompt },
-      ...messages,
-    ]);
-
-    // Replace [n] bracket refs with real markdown citation links built from
-    // the actual fetched abstracts — never trust the LLM to write URLs itself
-    const reply = rawReply.replace(/\[(\d+)\]/g, (match, numStr) => {
-      const n = Number(numStr);
-      if (!Number.isInteger(n) || n < 1 || n > abstracts.length) return match;
-      const a = abstracts[n - 1];
-      return `[${a.authors}, ${a.year}](https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/)`;
-    });
-
-    res.json({ reply });
-  } catch (err) {
-    console.error('[/api/chat]', err);
-    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
