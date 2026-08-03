@@ -27,17 +27,13 @@ const SEARCH_SYSTEM_PROMPT = `You are a fitness science research assistant. Give
     { "label": "string (short label for this view)", "side": "for", "text": "string (1-2 sentences with specific findings from the literature)" },
     { "label": "string (short label for this view)", "side": "against", "text": "string (1-2 sentences with specific findings or limitations from the literature)" }
   ],
-  "studies": [
-    { "title": "string (AuthorLastName et al., Year — brief title)", "url": "string" },
-    { "title": "string", "url": "string" },
-    { "title": "string", "url": "string" }
-  ]
+  "studyRefs": [1, 2, 3]
 }
 
 Rules:
 - "consensus" must be exactly one of: "strong", "mixed", or "debate"
 - "perspectives" must have exactly 2 items — one with side "for", one with side "against"
-- "studies" must contain ONLY items from the retrieved literature above — use the exact PMID to construct the URL as https://pubmed.ncbi.nlm.nih.gov/<PMID>/. Do NOT fabricate or guess PMIDs. Include as many as were retrieved (up to 3); if fewer than 3 were retrieved, the array may have fewer than 3 items.
+- "studyRefs" must contain ONLY the bracket numbers (e.g. 1, 2, 3) of items from the retrieved literature above that you actually used, in order of relevance. Do NOT invent numbers that weren't retrieved. Include as many as were retrieved (up to 3); if fewer than 3 were retrieved, the array may have fewer than 3 items.
 - Base the summary, consensus, and perspectives on the retrieved abstracts. Do not contradict findings in the provided literature.
 - Return ONLY the raw JSON object. No markdown, no code fences, no extra text.`;
 
@@ -46,7 +42,7 @@ const CHAT_SYSTEM_PROMPT = `You are SimpleBL, an evidence-based fitness assistan
 Guidelines:
 - Keep responses to 3-5 sentences — concise and research-grounded
 - When studies conflict, present both sides and defer the judgment to the user
-- Cite studies inline as [Author et al., Year](https://pubmed.ncbi.nlm.nih.gov/PMID) — use ONLY exact PMIDs from the retrieved literature above. Do NOT fabricate or guess PMIDs. If no literature was retrieved, do not include any citation links at all
+- Cite studies inline using bracket reference numbers matching the retrieved literature above, e.g. "...increases hypertrophy [1]." Do not write out URLs or author names yourself — just the bracket number. If no literature was retrieved, do not include any citation brackets at all
 - Be specific: reference sample sizes, effect sizes, and study designs when the retrieved abstracts provide them
 - Never present contested topics as settled science
 - Do not fabricate study findings — if the retrieved abstracts do not cover part of the question, say so
@@ -117,6 +113,24 @@ app.post('/api/search', async (req: Request, res: Response) => {
     );
 
     const result = JSON.parse(sanitized);
+
+    // Build studies from real fetched abstracts — never trust the LLM to
+    // transcribe PMIDs/titles/URLs itself, only which indices it referenced
+    const refs: unknown = result.studyRefs;
+    const studyRefs = Array.isArray(refs) ? refs : [];
+    delete result.studyRefs;
+    const seen = new Set<number>();
+    result.studies = studyRefs
+      .filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= abstracts.length)
+      .filter((n) => (seen.has(n) ? false : (seen.add(n), true)))
+      .map((n) => {
+        const a = abstracts[n - 1];
+        return {
+          title: `${a.authors}, ${a.year} — ${a.title}`,
+          url: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`,
+        };
+      });
+
     res.json(result);
   } catch (err) {
     console.error('[/api/search]', err);
@@ -149,10 +163,20 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     : CHAT_SYSTEM_PROMPT;
 
   try {
-    const reply = await callLLM([
+    const rawReply = await callLLM([
       { role: 'system', content: systemPrompt },
       ...messages,
     ]);
+
+    // Replace [n] bracket refs with real markdown citation links built from
+    // the actual fetched abstracts — never trust the LLM to write URLs itself
+    const reply = rawReply.replace(/\[(\d+)\]/g, (match, numStr) => {
+      const n = Number(numStr);
+      if (!Number.isInteger(n) || n < 1 || n > abstracts.length) return match;
+      const a = abstracts[n - 1];
+      return `[${a.authors}, ${a.year}](https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/)`;
+    });
+
     res.json({ reply });
   } catch (err) {
     console.error('[/api/chat]', err);
