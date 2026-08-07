@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import { SearchResult } from '../types';
 import TopicChip from './TopicChip';
 import ResultCard from './ResultCard';
@@ -39,6 +39,7 @@ function SearchSkeleton() {
 
 export default function SearchPanel() {
   const [query, setQuery] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +75,21 @@ export default function SearchPanel() {
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const resizeTextarea = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  const handleQueryChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setQuery(e.target.value);
+    resizeTextarea();
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       setActiveChip(null);
       search(query);
     }
@@ -85,11 +99,13 @@ export default function SearchPanel() {
     if (activeChip === topic) {
       setActiveChip(null);
       setQuery('');
+      requestAnimationFrame(resizeTextarea);
       return;
     }
     setActiveChip(topic);
     setQuery(topic);
     search(topic);
+    requestAnimationFrame(resizeTextarea);
   };
 
   const handleSearchClick = () => {
@@ -101,7 +117,7 @@ export default function SearchPanel() {
     <div className="space-y-4">
       {/* Search input */}
       <div className="relative">
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+        <div className="absolute top-3 left-4 flex items-center pointer-events-none">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
             <path
               d="M6.5 11.5A5 5 0 1 0 6.5 1.5a5 5 0 0 0 0 10ZM13 13l-2.5-2.5"
@@ -111,18 +127,20 @@ export default function SearchPanel() {
             />
           </svg>
         </div>
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={handleQueryChange}
           onKeyDown={handleKeyDown}
           placeholder="Search any lifting topic…"
-          className="w-full pl-10 pr-11 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/10 transition-all duration-200 shadow-sm"
+          rows={1}
+          maxLength={1000}
+          className="w-full pl-10 pr-11 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/10 transition-all duration-200 shadow-sm resize-none overflow-hidden leading-normal"
         />
         <button
           onClick={handleSearchClick}
           disabled={loading || !query.trim()}
-          className="absolute inset-y-0 right-0 flex items-center px-3"
+          className="absolute top-0 right-0 flex items-center px-3 h-11"
           aria-label="Search"
         >
           <div
