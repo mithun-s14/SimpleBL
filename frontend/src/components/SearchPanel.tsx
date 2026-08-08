@@ -1,4 +1,5 @@
 import { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
+import { ThinkingOrb } from 'thinking-orbs';
 import { SearchResult } from '../types';
 import TopicChip from './TopicChip';
 import ResultCard from './ResultCard';
@@ -195,8 +196,15 @@ export default function SearchPanel() {
         ))}
       </div>
 
-      {/* Loading skeleton */}
-      {loading && <SearchSkeleton />}
+      {/* Loading state */}
+      {loading && (
+        <>
+          <div className="flex justify-center py-4">
+            <ThinkingOrb state="connecting" size={64} />
+          </div>
+          <SearchSkeleton />
+        </>
+      )}
 
       {/* Error state */}
       {error && !loading && (
