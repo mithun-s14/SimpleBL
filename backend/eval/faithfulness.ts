@@ -5,7 +5,7 @@ import type { RetrievedDoc } from './types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const DEFAULT_JUDGE_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_JUDGE_MODEL = 'openai/gpt-oss-120b';
 
 // Override with GROQ_JUDGE_MODEL env var to use a different model for the judge
 function getJudgeModel(): string {

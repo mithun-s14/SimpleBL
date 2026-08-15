@@ -12,10 +12,10 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 // Number of documents the app retrieves per query (retmax=8 in esearch -- see backend/src/pubmed.ts)
 const TOP_K = 8;
 
-// Groq pricing for llama-3.3-70b-versatile in USD per million tokens
+// Groq pricing for openai/gpt-oss-120b in USD per million tokens
 // https://groq.com/pricing
-const INPUT_PRICE_PER_M_TOKENS = 0.59;
-const OUTPUT_PRICE_PER_M_TOKENS = 0.79;
+const INPUT_PRICE_PER_M_TOKENS = 0.15;
+const OUTPUT_PRICE_PER_M_TOKENS = 0.6;
 
 function computeCostUsd(promptTokens: number, completionTokens: number): number {
   return (
