@@ -199,15 +199,6 @@ A 340ms delay is added between requests to respect NCBI's rate limit of 3 reques
 
 ---
 
-## Design Decisions
-
-- **No vector DB or caching** — PubMed is queried live on every request to keep results current. Latency is acceptable for this use case.
-- **Groq over OpenAI** — Chosen for lower latency and cost with the `openai/gpt-oss-120b` model.
-- **Structured JSON for search** — The LLM returns a strict schema for the search endpoint, validated and parsed by the backend before sending to the client. Markdown code fences are stripped before `JSON.parse`.
-- **Honest uncertainty over false confidence** — Topics with contested evidence are labeled as such rather than picking a side.
-
----
-
 ## License
 
 MIT
