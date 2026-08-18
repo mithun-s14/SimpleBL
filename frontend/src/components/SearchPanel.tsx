@@ -14,30 +14,6 @@ const TOPICS = [
   'Carbohydrates',
 ];
 
-function SearchSkeleton() {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="h-4 bg-gray-100 rounded-full w-40 animate-pulse" />
-        <div className="h-6 bg-gray-100 rounded-full w-32 animate-pulse flex-shrink-0" />
-      </div>
-      <div className="space-y-2 mb-6">
-        <div className="h-3 bg-gray-100 rounded-full animate-pulse" />
-        <div className="h-3 bg-gray-100 rounded-full w-5/6 animate-pulse" />
-        <div className="h-3 bg-gray-100 rounded-full w-4/6 animate-pulse" />
-      </div>
-      <div className="space-y-2 mb-6">
-        <div className="h-16 bg-gray-50 rounded-xl animate-pulse" />
-        <div className="h-16 bg-gray-50 rounded-xl animate-pulse" />
-      </div>
-      <div className="flex gap-2">
-        <div className="h-7 bg-gray-100 rounded-full w-48 animate-pulse" />
-        <div className="h-7 bg-gray-100 rounded-full w-36 animate-pulse" />
-      </div>
-    </div>
-  );
-}
-
 export default function SearchPanel() {
   const [query, setQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -198,12 +174,9 @@ export default function SearchPanel() {
 
       {/* Loading state */}
       {loading && (
-        <>
-          <div className="flex justify-center py-4">
-            <ThinkingOrb state="connecting" size={64} />
-          </div>
-          <SearchSkeleton />
-        </>
+        <div className="flex justify-center py-4">
+          <ThinkingOrb state="connecting" size={64} />
+        </div>
       )}
 
       {/* Error state */}
