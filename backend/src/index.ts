@@ -20,12 +20,12 @@ const SEARCH_SYSTEM_PROMPT = `You are a fitness science research assistant. Give
 
 {
   "topic": "string",
-  "summary": "string (2-3 sentences grounded in the retrieved abstracts — be specific: cite effect sizes, sample sizes, and methodologies where available)",
+  "summary": "string (2-3 sentences grounded in the retrieved abstracts — be specific: cite effect sizes, sample sizes, and methodologies where available, and mark each cited finding with its bracket number, e.g. [1])",
   "consensus": "strong | mixed | debate",
-  "consensusNote": "string (one sentence describing the current state of evidence based on the retrieved literature)",
+  "consensusNote": "string (one sentence describing the current state of evidence based on the retrieved literature, with bracket numbers for anything cited)",
   "perspectives": [
-    { "label": "string (short label for this view)", "side": "for", "text": "string (1-2 sentences with specific findings from the literature)" },
-    { "label": "string (short label for this view)", "side": "against", "text": "string (1-2 sentences with specific findings or limitations from the literature)" }
+    { "label": "string (short label for this view)", "side": "for", "text": "string (1-2 sentences with specific findings from the literature, with bracket numbers for anything cited)" },
+    { "label": "string (short label for this view)", "side": "against", "text": "string (1-2 sentences with specific findings or limitations from the literature, with bracket numbers for anything cited)" }
   ],
   "studyRefs": [1, 2, 3]
 }
@@ -33,7 +33,8 @@ const SEARCH_SYSTEM_PROMPT = `You are a fitness science research assistant. Give
 Rules:
 - "consensus" must be exactly one of: "strong", "mixed", or "debate"
 - "perspectives" must have exactly 2 items — one with side "for", one with side "against"
-- "studyRefs" must contain ONLY the bracket numbers (e.g. 1, 2, 3) of items from the retrieved literature above that you actually used, in order of relevance. Do NOT invent numbers that weren't retrieved. Include as many as were retrieved (up to 3); if fewer than 3 were retrieved, the array may have fewer than 3 items.
+- Every claim in "summary", "consensusNote", and "perspectives" that draws on the retrieved literature must carry an inline bracket number (e.g. [1]) matching the item it came from.
+- "studyRefs" must contain EXACTLY the set of bracket numbers used anywhere in "summary", "consensusNote", or "perspectives" — no more, no fewer — in order of relevance. Do NOT invent numbers that weren't retrieved, do NOT omit any number cited in the text, and do NOT include a number in "studyRefs" that isn't cited in the text.
 - Base the summary, consensus, and perspectives on the retrieved abstracts. Do not contradict findings in the provided literature.
 - Return ONLY the raw JSON object. No markdown, no code fences, no extra text.`;
 
