@@ -2,7 +2,8 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fetchPubMedAbstracts, buildContextBlock } from './pubmed';
+import { fetchPubMedAbstracts, buildContextBlock, fetchArticleByPmid } from './pubmed';
+import { resolvePmcId, fetchPmcFullText } from './pmc';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
@@ -116,6 +117,7 @@ app.post('/api/search', async (req: Request, res: Response) => {
       .map((n) => {
         const a = abstracts[n - 1];
         return {
+          pmid: a.pmid,
           title: `${a.authors}, ${a.year} — ${a.title}`,
           url: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`,
         };
@@ -129,6 +131,65 @@ app.post('/api/search', async (req: Request, res: Response) => {
     } else {
       res.status(500).json({ error: 'Could not load results. Please try again.' });
     }
+  }
+});
+
+function buildStudyChatSystemPrompt(
+  article: { pmid: string; title: string; authors: string; year: string; abstract: string },
+  fullText: string | null
+): string {
+  const source = fullText
+    ? `=== FULL TEXT (open-access, via PMC) ===\n${fullText}`
+    : `=== ABSTRACT ONLY (full text is not freely available for this study) ===\n${article.abstract}`;
+
+  return `You are a research assistant answering questions about ONE specific study.
+
+Title: ${article.title}
+Authors: ${article.authors}${article.year ? ` (${article.year})` : ''}
+PMID: ${article.pmid}
+URL: https://pubmed.ncbi.nlm.nih.gov/${article.pmid}/
+
+${source}
+
+Rules:
+- Answer only using the text provided above. Do not invent methods, numbers, or findings that aren't in it.
+- If the user asks something the provided text doesn't cover, say so plainly (e.g. "The abstract doesn't go into that — you'd need the full paper for that detail") and point them to the PubMed link. Never guess.
+- ${fullText ? 'You have the full text of the paper, so you can discuss methods, results, and discussion in detail.' : 'You only have the abstract, so avoid claiming specifics (exact statistics, detailed methodology) beyond what it states — be upfront that finer detail requires the full paper, which may sit behind a publisher paywall.'}
+- Keep answers concise: 2-4 sentences unless the user asks for more detail.`;
+}
+
+app.post('/api/study/chat', async (req: Request, res: Response) => {
+  const { pmid, messages } = req.body as {
+    pmid?: string;
+    messages?: Array<{ role: string; content: string }>;
+  };
+
+  if (!pmid || typeof pmid !== 'string' || !pmid.trim()) {
+    res.status(400).json({ error: 'pmid is required' });
+    return;
+  }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    res.status(400).json({ error: 'messages is required' });
+    return;
+  }
+
+  const article = await fetchArticleByPmid(pmid.trim());
+  if (!article) {
+    res.status(404).json({ error: 'Study not found' });
+    return;
+  }
+
+  const pmcId = await resolvePmcId(article.pmid);
+  const fullText = pmcId ? await fetchPmcFullText(pmcId) : null;
+
+  const systemPrompt = buildStudyChatSystemPrompt(article, fullText);
+
+  try {
+    const reply = await callLLM([{ role: 'system', content: systemPrompt }, ...messages]);
+    res.json({ reply, fullTextAvailable: Boolean(fullText) });
+  } catch (err) {
+    console.error('[/api/study/chat]', err);
+    res.status(500).json({ error: 'Could not get a response. Please try again.' });
   }
 });
 

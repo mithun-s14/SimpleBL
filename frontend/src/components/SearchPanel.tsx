@@ -1,8 +1,9 @@
 import { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { SearchResult } from '../types';
+import { ChatMessage, SearchResult, Study } from '../types';
 import TopicChip from './TopicChip';
 import ResultCard from './ResultCard';
+import StudyChatModal from './StudyChatModal';
 
 const TOPICS = [
   'Strength',
@@ -21,6 +22,11 @@ export default function SearchPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeChip, setActiveChip] = useState<string | null>(null);
+
+  const [activeStudy, setActiveStudy] = useState<Study | null>(null);
+  const [studyChats, setStudyChats] = useState<Record<string, ChatMessage[]>>({});
+  const [studyFullTextAvailable, setStudyFullTextAvailable] = useState<Record<string, boolean>>({});
+  const [studyChatLoading, setStudyChatLoading] = useState(false);
 
   const search = async (q: string) => {
     if (!q.trim()) return;
@@ -88,6 +94,56 @@ export default function SearchPanel() {
   const handleSearchClick = () => {
     setActiveChip(null);
     search(query);
+  };
+
+  const handleAskStudy = (study: Study) => {
+    setActiveStudy(study);
+  };
+
+  const handleSendStudyQuestion = async (question: string) => {
+    if (!activeStudy) return;
+    const pmid = activeStudy.pmid;
+    const priorMessages = studyChats[pmid] ?? [];
+    const nextMessages: ChatMessage[] = [...priorMessages, { role: 'user', content: question }];
+    setStudyChats((prev) => ({ ...prev, [pmid]: nextMessages }));
+    setStudyChatLoading(true);
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+      const res = await fetch(`${apiBase}/api/study/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pmid, messages: nextMessages }),
+      });
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error ?? 'Could not get a response.');
+      }
+
+      const data = (await res.json()) as { reply: string; fullTextAvailable: boolean };
+      setStudyFullTextAvailable((prev) => ({ ...prev, [pmid]: data.fullTextAvailable }));
+      setStudyChats((prev) => ({
+        ...prev,
+        [pmid]: [...nextMessages, { role: 'assistant', content: data.reply }],
+      }));
+    } catch (err) {
+      setStudyChats((prev) => ({
+        ...prev,
+        [pmid]: [
+          ...nextMessages,
+          {
+            role: 'assistant',
+            content:
+              err instanceof Error
+                ? err.message
+                : 'Something went wrong. Please try again.',
+          },
+        ],
+      }));
+    } finally {
+      setStudyChatLoading(false);
+    }
   };
 
   return (
@@ -197,7 +253,19 @@ export default function SearchPanel() {
       )}
 
       {/* Result */}
-      {result && !loading && <ResultCard result={result} />}
+      {result && !loading && <ResultCard result={result} onAskStudy={handleAskStudy} />}
+
+      {/* Study chat modal */}
+      {activeStudy && (
+        <StudyChatModal
+          study={activeStudy}
+          messages={studyChats[activeStudy.pmid] ?? []}
+          loading={studyChatLoading}
+          fullTextAvailable={studyFullTextAvailable[activeStudy.pmid] ?? null}
+          onSend={handleSendStudyQuestion}
+          onClose={() => setActiveStudy(null)}
+        />
+      )}
 
       {/* Empty state */}
       {!result && !loading && !error && (

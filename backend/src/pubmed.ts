@@ -82,6 +82,33 @@ async function esearch(pubmedQuery: string): Promise<string[]> {
   return data.esearchresult.idlist ?? [];
 }
 
+// Parse a single <PubmedArticle> XML fragment (everything after the opening tag)
+function parseArticle(article: string): PubMedAbstract | null {
+  const pmidMatch = article.match(/<PMID[^>]*>(\d+)<\/PMID>/);
+  if (!pmidMatch) return null;
+  const pmid = pmidMatch[1];
+
+  const titleMatch = article.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
+  const title = titleMatch ? decodeEntities(titleMatch[1]) : 'Untitled';
+
+  const lastNameMatch = article.match(/<LastName>([^<]+)<\/LastName>/);
+  const authors = lastNameMatch ? `${lastNameMatch[1]} et al.` : 'Unknown authors';
+
+  const yearMatch = article.match(/<Year>(\d{4})<\/Year>/);
+  const year = yearMatch ? yearMatch[1] : '';
+
+  // Structured abstracts have multiple <AbstractText> elements; join them
+  const abstractParts: string[] = [];
+  const abstractRegex = /<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g;
+  let m: RegExpExecArray | null;
+  while ((m = abstractRegex.exec(article)) !== null) {
+    abstractParts.push(decodeEntities(m[1]));
+  }
+  const abstract = abstractParts.join(' ');
+
+  return abstract ? { pmid, title, authors, year, abstract } : null;
+}
+
 async function efetch(pmids: string[]): Promise<PubMedAbstract[]> {
   const url = `${EUTILS}/efetch.fcgi?db=pubmed&id=${pmids.join(',')}&rettype=abstract&retmode=xml&${TOOL_PARAMS}`;
   const res = await fetchWithRetry(url);
@@ -93,34 +120,22 @@ async function efetch(pmids: string[]): Promise<PubMedAbstract[]> {
   const results: PubMedAbstract[] = [];
 
   for (const article of articles.slice(1)) {
-    const pmidMatch = article.match(/<PMID[^>]*>(\d+)<\/PMID>/);
-    if (!pmidMatch) continue;
-    const pmid = pmidMatch[1];
-
-    const titleMatch = article.match(/<ArticleTitle>([\s\S]*?)<\/ArticleTitle>/);
-    const title = titleMatch ? decodeEntities(titleMatch[1]) : 'Untitled';
-
-    const lastNameMatch = article.match(/<LastName>([^<]+)<\/LastName>/);
-    const authors = lastNameMatch ? `${lastNameMatch[1]} et al.` : 'Unknown authors';
-
-    const yearMatch = article.match(/<Year>(\d{4})<\/Year>/);
-    const year = yearMatch ? yearMatch[1] : '';
-
-    // Structured abstracts have multiple <AbstractText> elements; join them
-    const abstractParts: string[] = [];
-    const abstractRegex = /<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g;
-    let m: RegExpExecArray | null;
-    while ((m = abstractRegex.exec(article)) !== null) {
-      abstractParts.push(decodeEntities(m[1]));
-    }
-    const abstract = abstractParts.join(' ');
-
-    if (abstract) {
-      results.push({ pmid, title, authors, year, abstract });
-    }
+    const parsed = parseArticle(article);
+    if (parsed) results.push(parsed);
   }
 
   return results;
+}
+
+// Fetch a single article by PMID — returns null if not found or on failure
+export async function fetchArticleByPmid(pmid: string): Promise<PubMedAbstract | null> {
+  try {
+    const results = await efetch([pmid]);
+    return results[0] ?? null;
+  } catch (err) {
+    console.warn(`[pubmed] fetchArticleByPmid(${pmid}) failed:`, err);
+    return null;
+  }
 }
 
 export function buildContextBlock(abstracts: PubMedAbstract[]): string {

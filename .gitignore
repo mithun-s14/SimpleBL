@@ -5,4 +5,5 @@ dist/
 .DS_Store
 .vite/
 PRD.MD
+MDs/
 .claude
