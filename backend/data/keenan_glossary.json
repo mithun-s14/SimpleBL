@@ -1,0 +1,13 @@
+[
+  { "wrong": "our IR", "right": "RIR" },
+  { "wrong": "are IR", "right": "RIR" },
+  { "wrong": "my a reps", "right": "myo-reps" },
+  { "wrong": "myo reps", "right": "myo-reps" },
+  { "wrong": "mile reps", "right": "myo-reps" },
+  { "wrong": "lengthened partial's", "right": "lengthened partials" },
+  { "wrong": "length and partials", "right": "lengthened partials" },
+  { "wrong": "mechanical tention", "right": "mechanical tension" },
+  { "wrong": "hyper trophy", "right": "hypertrophy" },
+  { "wrong": "junk vol", "right": "junk volume" },
+  {"wrong": "henman size principle", "right": "henneman's size principle" }
+]

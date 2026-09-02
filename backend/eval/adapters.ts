@@ -66,7 +66,7 @@ export async function runQuery(question: string): Promise<RagResult> {
   const answer = data.choices[0].message.content;
 
   const retrievedDocs: RetrievedDoc[] = abstracts.map((a) => ({
-    pmid: a.pmid,
+    id: a.pmid,
     title: a.title,
     // Use the abstract as the text field -- this is the snippet passed to the model
     text: a.abstract,
