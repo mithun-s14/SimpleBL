@@ -1,8 +1,16 @@
 node_modules/
+# Keenan corpus: rebuilt by the ingest job and shipped as a release asset,
+# never committed -- it grows ~25 MB/year of binary.
+backend/data/*.db
+backend/data/*.db-wal
+backend/data/*.db-shm
+frontend/.env.local
+.venv/
 dist/
 .env
 *.log
 .DS_Store
 .vite/
 PRD.MD
+MDs/
 .claude

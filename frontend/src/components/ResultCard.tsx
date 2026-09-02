@@ -1,9 +1,10 @@
-import { SearchResult, ConsensusLevel } from '../types';
+import { SearchResult, ConsensusLevel, Study } from '../types';
 import PerspectiveBlock from './PerspectiveBlock';
 import StudyLink from './StudyLink';
 
 interface ResultCardProps {
   result: SearchResult;
+  onAskStudy: (study: Study) => void;
 }
 
 const CONSENSUS_CONFIG: Record<
@@ -30,7 +31,7 @@ const CONSENSUS_CONFIG: Record<
   },
 };
 
-export default function ResultCard({ result }: ResultCardProps) {
+export default function ResultCard({ result, onAskStudy }: ResultCardProps) {
   const consensus = CONSENSUS_CONFIG[result.consensus] ?? CONSENSUS_CONFIG.mixed;
 
   return (
@@ -70,7 +71,7 @@ export default function ResultCard({ result }: ResultCardProps) {
           </h3>
           <div className="flex flex-wrap gap-2">
             {result.studies.map((study, i) => (
-              <StudyLink key={i} study={study} />
+              <StudyLink key={i} study={study} onAsk={onAskStudy} />
             ))}
           </div>
         </div>
