@@ -29,7 +29,7 @@ const VERDICT_WEIGHTS: Record<string, number> = {
   unsupported: 0.0,
 };
 
-const JUDGE_SYSTEM_PROMPT = `You are a faithfulness evaluator for a research assistant.
+const JUDGE_SYSTEM_PROMPT = `You are a faithfulness evaluator for a medical research assistant.
 Your job is to assess whether claims made in an answer are grounded in the provided source documents.
 
 Steps:
@@ -58,7 +58,7 @@ export async function scoreFaithfulness(
   if (sourceDocs.length === 0) return 0;
 
   const sourcesText = sourceDocs
-    .map((d, i) => `[${i + 1}] Source: ${d.id}\nTitle: ${d.title}\n${d.text}`)
+    .map((d, i) => `[${i + 1}] PMID: ${d.pmid}\nTitle: ${d.title}\n${d.text}`)
     .join('\n\n');
 
   const userPrompt = `ANSWER TO EVALUATE:\n${answer}\n\nSOURCE DOCUMENTS:\n${sourcesText}`;

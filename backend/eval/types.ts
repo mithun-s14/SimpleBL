@@ -1,12 +1,10 @@
 // Shared types for the SimpleBL eval harness
 
-// A single document retrieved and shown to the model. `id` is whatever
-// identifies a source in that corpus: a PMID for PubMed, a YouTube video ID
-// for the Keenan transcripts.
+// A single document retrieved from PubMed and shown to the model
 export interface RetrievedDoc {
-  id: string;
+  pmid: string;
   title: string;
-  // The text actually passed to the model in the context block
+  // The abstract text actually passed to the model in the context block
   text: string;
 }
 
@@ -21,13 +19,12 @@ export interface RagResult {
   };
 }
 
-// One labeled example in the eval set. `relevantIds` holds PMIDs for the
-// PubMed set and YouTube video IDs for the Keenan set.
+// One labeled example in the eval set
 export interface EvalCase {
   id: string;
   question: string;
-  // Judged relevant for this question; fill these in before trusting retrieval scores
-  relevantIds: string[];
+  // PMIDs judged relevant for this question; fill these in before trusting retrieval scores
+  relevantPmids: string[];
 }
 
 // Scores and metadata for a single eval case after running it
@@ -39,6 +36,6 @@ export interface CaseResult {
   faithfulness: number;
   latencyMs: number;
   costUsd: number;
-  retrievedIds: string[];
+  retrievedPmids: string[];
   answer: string;
 }

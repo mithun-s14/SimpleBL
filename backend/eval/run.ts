@@ -36,18 +36,18 @@ async function main(): Promise<void> {
   for (const evalCase of cases) {
     console.log(`[${evalCase.id}] ${evalCase.question}`);
 
-    const relevantSet = new Set(evalCase.relevantIds.map(String));
+    const relevantSet = new Set(evalCase.relevantPmids.map(String));
 
     // Time only the app pipeline, not the faithfulness judge
     const start = Date.now();
     const ragResult = await runQuery(evalCase.question);
     const latencyMs = Date.now() - start;
 
-    const retrievedIds = ragResult.retrievedDocs.map((d) => d.id);
-    const precision = precisionAtK(retrievedIds, relevantSet);
-    const recall = recallAtK(retrievedIds, relevantSet);
+    const retrievedPmids = ragResult.retrievedDocs.map((d) => d.pmid);
+    const precision = precisionAtK(retrievedPmids, relevantSet);
+    const recall = recallAtK(retrievedPmids, relevantSet);
 
-    console.log(`  Retrieved ${retrievedIds.length} doc(s) in ${latencyMs}ms`);
+    console.log(`  Retrieved ${retrievedPmids.length} doc(s) in ${latencyMs}ms`);
     console.log(`  Scoring faithfulness...`);
     const faith = await scoreFaithfulness(ragResult.answer, ragResult.retrievedDocs);
 
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
       faithfulness: faith,
       latencyMs,
       costUsd,
-      retrievedIds,
+      retrievedPmids,
       answer: ragResult.answer,
     });
   }

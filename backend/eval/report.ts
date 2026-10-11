@@ -45,7 +45,7 @@ export function printReport(results: CaseResult[], k: number): void {
         ` cost=$${r.costUsd.toFixed(5)}`
     );
     console.log(`  Q: ${r.question}`);
-    console.log(`  IDs retrieved:   ${r.retrievedIds.join(', ') || 'none'}`);
+    console.log(`  PMIDs retrieved: ${r.retrievedPmids.join(', ') || 'none'}`);
     // Truncate long answers so the report stays readable
     const snippet = r.answer.length > 140 ? r.answer.slice(0, 140) + '...' : r.answer;
     console.log(`  A: ${snippet}`);
