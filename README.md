@@ -196,6 +196,12 @@ A 340ms delay is added between requests to respect NCBI's rate limit of 3 reques
 |---|---|---|
 | `GROQ_API_KEY` | Yes | API key for Groq LLM requests |
 | `PORT` | No | Backend port (default: `3001`) |
+| `VITE_SUPABASE_URL` | Yes | Supabase project URL (in `frontend/.env.local`; GitHub secret for deploys) |
+| `VITE_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key (same places) |
+
+### Accounts & saved studies (Supabase)
+
+Sign-up/log-in uses Supabase Auth; saved studies live in the `saved_studies` table, protected by row-level security so users only see their own. To set up a project, run `supabase/schema.sql` in the Supabase SQL editor.
 
 ---
 

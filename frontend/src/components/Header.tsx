@@ -1,6 +1,26 @@
-export default function Header() {
+interface HeaderProps {
+  email: string | null;
+  onLogin: () => void;
+  onLogout: () => void;
+}
+
+export default function Header({ email, onLogin, onLogout }: HeaderProps) {
   return (
     <header className="mb-8 text-center">
+      <div className="flex justify-end gap-3 mb-4 text-xs">
+        {email ? (
+          <>
+            <span className="text-gray-400 truncate">{email}</span>
+            <button onClick={onLogout} className="text-gray-500 hover:text-gray-900">
+              Log out
+            </button>
+          </>
+        ) : (
+          <button onClick={onLogin} className="text-brand-green font-medium hover:underline">
+            Log in / Sign up
+          </button>
+        )}
+      </div>
       <div className="flex items-center justify-center gap-2.5 mb-2">
         {/* Logo mark */}
         <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm flex items-center justify-center">

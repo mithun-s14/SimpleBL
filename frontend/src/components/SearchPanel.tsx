@@ -1,9 +1,11 @@
-import { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { ChatMessage, SearchResult, Study } from '../types';
 import TopicChip from './TopicChip';
 import ResultCard from './ResultCard';
 import StudyChatModal from './StudyChatModal';
+import StudyLink from './StudyLink';
+import { supabase } from '../supabase';
 
 const TOPICS = [
   'Strength',
@@ -15,7 +17,14 @@ const TOPICS = [
   'Carbohydrates',
 ];
 
-export default function SearchPanel() {
+interface SearchPanelProps {
+  userId: string | null;
+  onRequireLogin: () => void;
+}
+
+const pubmedUrl = (pmid: string) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
+
+export default function SearchPanel({ userId, onRequireLogin }: SearchPanelProps) {
   const [query, setQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -27,6 +36,37 @@ export default function SearchPanel() {
   const [studyChats, setStudyChats] = useState<Record<string, ChatMessage[]>>({});
   const [studyFullTextAvailable, setStudyFullTextAvailable] = useState<Record<string, boolean>>({});
   const [studyChatLoading, setStudyChatLoading] = useState(false);
+
+  const [savedStudies, setSavedStudies] = useState<Study[]>([]);
+  const savedPmids = new Set(savedStudies.map((s) => s.pmid));
+
+  useEffect(() => {
+    if (!userId) {
+      setSavedStudies([]);
+      return;
+    }
+    supabase
+      .from('saved_studies')
+      .select('pmid, title')
+      .order('saved_at', { ascending: false })
+      .then(({ data }) =>
+        setSavedStudies((data ?? []).map((s) => ({ ...s, url: pubmedUrl(s.pmid) })))
+      );
+  }, [userId]);
+
+  const handleToggleSave = async (study: Study) => {
+    if (!userId) {
+      onRequireLogin();
+      return;
+    }
+    const wasSaved = savedPmids.has(study.pmid);
+    const prev = savedStudies;
+    setSavedStudies(wasSaved ? prev.filter((s) => s.pmid !== study.pmid) : [study, ...prev]);
+    const { error } = wasSaved
+      ? await supabase.from('saved_studies').delete().eq('pmid', study.pmid)
+      : await supabase.from('saved_studies').upsert({ pmid: study.pmid, title: study.title.slice(0, 500) });
+    if (error) setSavedStudies(prev);
+  };
 
   const search = async (q: string) => {
     if (!q.trim()) return;
@@ -253,7 +293,34 @@ export default function SearchPanel() {
       )}
 
       {/* Result */}
-      {result && !loading && <ResultCard result={result} onAskStudy={handleAskStudy} />}
+      {result && !loading && (
+        <ResultCard
+          result={result}
+          onAskStudy={handleAskStudy}
+          savedPmids={savedPmids}
+          onToggleSave={handleToggleSave}
+        />
+      )}
+
+      {/* Saved studies */}
+      {savedStudies.length > 0 && (
+        <div>
+          <h3 className="text-[10px] font-semibold font-mono uppercase tracking-widest text-gray-400 mb-2.5">
+            Your saved studies
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {savedStudies.map((study) => (
+              <StudyLink
+                key={study.pmid}
+                study={study}
+                onAsk={handleAskStudy}
+                saved
+                onToggleSave={handleToggleSave}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Study chat modal */}
       {activeStudy && (

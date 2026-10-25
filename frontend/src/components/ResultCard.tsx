@@ -5,6 +5,8 @@ import StudyLink from './StudyLink';
 interface ResultCardProps {
   result: SearchResult;
   onAskStudy: (study: Study) => void;
+  savedPmids: Set<string>;
+  onToggleSave: (study: Study) => void;
 }
 
 const CONSENSUS_CONFIG: Record<
@@ -31,7 +33,7 @@ const CONSENSUS_CONFIG: Record<
   },
 };
 
-export default function ResultCard({ result, onAskStudy }: ResultCardProps) {
+export default function ResultCard({ result, onAskStudy, savedPmids, onToggleSave }: ResultCardProps) {
   const consensus = CONSENSUS_CONFIG[result.consensus] ?? CONSENSUS_CONFIG.mixed;
 
   return (
@@ -71,7 +73,13 @@ export default function ResultCard({ result, onAskStudy }: ResultCardProps) {
           </h3>
           <div className="flex flex-wrap gap-2">
             {result.studies.map((study, i) => (
-              <StudyLink key={i} study={study} onAsk={onAskStudy} />
+              <StudyLink
+                key={i}
+                study={study}
+                onAsk={onAskStudy}
+                saved={savedPmids.has(study.pmid)}
+                onToggleSave={onToggleSave}
+              />
             ))}
           </div>
         </div>
