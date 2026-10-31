@@ -134,9 +134,35 @@ app.post('/api/search', async (req: Request, res: Response) => {
   }
 });
 
+// Study lookup for the Discuss page: a bare PMID fetches that article, anything else searches PubMed
+app.get('/api/studies/search', async (req: Request, res: Response) => {
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (!q) {
+    res.status(400).json({ error: 'q is required' });
+    return;
+  }
+  const byPmid = /^\d+$/.test(q) ? await fetchArticleByPmid(q) : null;
+  const articles = byPmid ? [byPmid] : await fetchPubMedAbstracts(q);
+  res.json(
+    articles.map((a) => ({
+      pmid: a.pmid,
+      title: `${a.authors}, ${a.year} — ${a.title}`,
+      url: `https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/`,
+    }))
+  );
+});
+
+const DEBATE_RULES = `
+- This is a DEBATE. Act as a sharp, fair critical-appraisal partner, not a cheerleader for the study or the user.
+- When the user makes a claim, test it against the study: agree where the text supports it, push back where it doesn't, and quote or cite the specific finding.
+- When asked to argue a side (or to counter a point), steelman it using the study, then name the strongest counterpoint.
+- Proactively raise limitations that matter: sample size, population (trained vs untrained, sex, age), duration, design (RCT vs observational), outcome measures, funding/conflicts if stated, and how far the results generalize.
+- You may use general research-methods knowledge to critique the design, but never invent data the text doesn't contain. Label any outside reasoning as such.`;
+
 function buildStudyChatSystemPrompt(
   article: { pmid: string; title: string; authors: string; year: string; abstract: string },
-  fullText: string | null
+  fullText: string | null,
+  debate = false
 ): string {
   const source = fullText
     ? `=== FULL TEXT (open-access, via PMC) ===\n${fullText}`
@@ -155,13 +181,14 @@ Rules:
 - Answer only using the text provided above. Do not invent methods, numbers, or findings that aren't in it.
 - If the user asks something the provided text doesn't cover, say so plainly (e.g. "The abstract doesn't go into that — you'd need the full paper for that detail") and point them to the PubMed link. Never guess.
 - ${fullText ? 'You have the full text of the paper, so you can discuss methods, results, and discussion in detail.' : 'You only have the abstract, so avoid claiming specifics (exact statistics, detailed methodology) beyond what it states — be upfront that finer detail requires the full paper, which may sit behind a publisher paywall.'}
-- Keep answers concise: 2-4 sentences unless the user asks for more detail.`;
+- Keep answers concise: 2-4 sentences unless the user asks for more detail.${debate ? DEBATE_RULES : ''}`;
 }
 
 app.post('/api/study/chat', async (req: Request, res: Response) => {
-  const { pmid, messages } = req.body as {
+  const { pmid, messages, mode } = req.body as {
     pmid?: string;
     messages?: Array<{ role: string; content: string }>;
+    mode?: string;
   };
 
   if (!pmid || typeof pmid !== 'string' || !pmid.trim()) {
@@ -182,7 +209,7 @@ app.post('/api/study/chat', async (req: Request, res: Response) => {
   const pmcId = await resolvePmcId(article.pmid);
   const fullText = pmcId ? await fetchPmcFullText(pmcId) : null;
 
-  const systemPrompt = buildStudyChatSystemPrompt(article, fullText);
+  const systemPrompt = buildStudyChatSystemPrompt(article, fullText, mode === 'debate');
 
   try {
     const reply = await callLLM([{ role: 'system', content: systemPrompt }, ...messages]);

@@ -8,6 +8,9 @@ interface StudyChatModalProps {
   fullTextAvailable: boolean | null;
   onSend: (question: string) => void;
   onClose: () => void;
+  inline?: boolean;
+  intro?: string;
+  placeholder?: string;
 }
 
 export default function StudyChatModal({
@@ -17,6 +20,9 @@ export default function StudyChatModal({
   fullTextAvailable,
   onSend,
   onClose,
+  inline = false,
+  intro,
+  placeholder = 'Ask about this study…',
 }: StudyChatModalProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -38,9 +44,14 @@ export default function StudyChatModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 px-0 sm:px-4">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-xl rounded-t-xl border border-gray-200 shadow-lg flex flex-col h-[85vh] sm:h-[600px] animate-slide-up">
+  const panel = (
+      <div
+        className={
+          inline
+            ? 'bg-white w-full rounded-xl border border-gray-200 shadow-sm flex flex-col h-[70vh] animate-fade-in'
+            : 'bg-white w-full sm:max-w-lg sm:rounded-xl rounded-t-xl border border-gray-200 shadow-lg flex flex-col h-[85vh] sm:h-[600px] animate-slide-up'
+        }
+      >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-4 border-b border-gray-100">
           <div className="min-w-0">
@@ -82,9 +93,13 @@ export default function StudyChatModal({
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
-              Ask me anything about this study. I'll answer from{' '}
-              {fullTextAvailable ? 'the full paper' : 'its abstract'} — and say so if
-              something isn't covered.
+              {intro ?? (
+                <>
+                  Ask me anything about this study. I'll answer from{' '}
+                  {fullTextAvailable ? 'the full paper' : 'its abstract'} — and say so if
+                  something isn't covered.
+                </>
+              )}
             </div>
           )}
           {messages.map((m, i) => (
@@ -112,7 +127,7 @@ export default function StudyChatModal({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about this study…"
+            placeholder={placeholder}
             rows={1}
             className="flex-1 resize-none px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-brand-green focus:ring-2 focus:ring-brand-green/10"
           />
@@ -129,6 +144,12 @@ export default function StudyChatModal({
           </button>
         </div>
       </div>
+  );
+
+  if (inline) return panel;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 px-0 sm:px-4">
+      {panel}
     </div>
   );
 }
