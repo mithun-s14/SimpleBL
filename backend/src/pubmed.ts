@@ -32,12 +32,47 @@ function extractKeywords(query: string): string {
   return words.slice(0, 7).join(' ');
 }
 
-// Narrow to fitness science — no study-type filter so conversational queries still match
-function enhanceQuery(query: string): string {
+const MAX_RESULTS = 8;
+
+// If the strict search finds fewer than this, top up with the broader search
+const MIN_STRICT_RESULTS = 4;
+
+const DOMAIN_FILTER =
+  '(exercise OR "resistance training" OR "strength training" OR "muscle hypertrophy" OR nutrition OR supplementation OR recovery OR athlete)';
+
+// Keep human studies only. The NOT clause drops animal-only papers but keeps
+// papers tagged with both humans and animals.
+const HUMAN_FILTER = '(humans[MeSH Terms] NOT (animals[MeSH Terms] NOT humans[MeSH Terms]))';
+
+// Higher-quality study designs for the strict pass
+const STUDY_DESIGN_FILTER =
+  '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR review[pt])';
+
+// Narrow to human fitness science. Strict mode also requires a strong study design.
+function enhanceQuery(query: string, strict: boolean): string {
   const keywords = extractKeywords(query);
-  const domain =
-    '(exercise OR "resistance training" OR "strength training" OR "muscle hypertrophy" OR nutrition OR supplementation OR recovery OR athlete)';
-  return `${keywords} AND ${domain}`;
+  const base = `(${keywords}) AND ${DOMAIN_FILTER} AND ${HUMAN_FILTER}`;
+  return strict ? `${base} AND ${STUDY_DESIGN_FILTER}` : base;
+}
+
+// Strict search first (human + strong designs). If it comes back thin, fill the
+// remaining slots from the broader human-only search, without duplicates.
+async function searchPmids(query: string): Promise<string[]> {
+  const strict = await esearch(enhanceQuery(query, true));
+  console.log(`[pubmed] strict esearch returned ${strict.length} PMIDs`);
+  if (strict.length >= MIN_STRICT_RESULTS) return strict;
+
+  // Respect NCBI's 3 req/sec limit between calls
+  await new Promise((r) => setTimeout(r, 340));
+  const broad = await esearch(enhanceQuery(query, false));
+  console.log(`[pubmed] broad esearch returned ${broad.length} PMIDs`);
+
+  const merged = [...strict];
+  for (const pmid of broad) {
+    if (merged.length >= MAX_RESULTS) break;
+    if (!merged.includes(pmid)) merged.push(pmid);
+  }
+  return merged;
 }
 
 // Decode common XML entities
@@ -75,7 +110,7 @@ async function fetchWithRetry(url: string, retries = 1, delayMs = 400): Promise<
 
 async function esearch(pubmedQuery: string): Promise<string[]> {
   const term = encodeURIComponent(pubmedQuery);
-  const url = `${EUTILS}/esearch.fcgi?db=pubmed&term=${term}&retmax=8&retmode=json&sort=relevance&${TOOL_PARAMS}`;
+  const url = `${EUTILS}/esearch.fcgi?db=pubmed&term=${term}&retmax=${MAX_RESULTS}&retmode=json&sort=relevance&${TOOL_PARAMS}`;
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`esearch ${res.status}`);
   const data = (await res.json()) as { esearchresult: { idlist: string[] } };
@@ -159,8 +194,8 @@ Abstract: ${a.abstract}`
 export async function fetchPubMedAbstracts(query: string): Promise<PubMedAbstract[]> {
   console.log(`[pubmed] searching for: "${query.slice(0, 80)}"`);
   try {
-    const pmids = await esearch(enhanceQuery(query));
-    console.log(`[pubmed] esearch returned ${pmids.length} PMIDs:`, pmids);
+    const pmids = await searchPmids(query);
+    console.log(`[pubmed] using ${pmids.length} PMIDs:`, pmids);
     if (pmids.length === 0) return [];
 
     // Respect NCBI's 3 req/sec limit between the two calls
