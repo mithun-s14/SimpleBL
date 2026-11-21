@@ -8,6 +8,16 @@ function parseRetryAfterMs(errorBody: string): number {
   return 15000;
 }
 
+// Total time spent sleeping on 429s, so run.ts can leave it out of latency
+let rateLimitWaitMs = 0;
+
+// Returns the wait time collected since the last call, then resets it
+export function takeRateLimitWaitMs(): number {
+  const waited = rateLimitWaitMs;
+  rateLimitWaitMs = 0;
+  return waited;
+}
+
 // Fetch a Groq endpoint and retry automatically on 429 rate limit responses.
 // Returns the Response once it has a non-429 status, or throws after maxRetries.
 export async function groqFetchWithRetry(
@@ -28,6 +38,7 @@ export async function groqFetchWithRetry(
           ` (retry ${attempt + 1}/${maxRetries})`
       );
       await new Promise<void>((r) => setTimeout(r, waitMs));
+      rateLimitWaitMs += waitMs;
     } else {
       throw new Error(`Groq 429 after ${maxRetries} retries: ${body}`);
     }

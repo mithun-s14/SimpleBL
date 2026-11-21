@@ -5,6 +5,7 @@ import { runQuery } from './adapters';
 import { precisionAtK, recallAtK } from './retrieval';
 import { scoreFaithfulness } from './faithfulness';
 import { printReport } from './report';
+import { takeRateLimitWaitMs } from './groq-retry';
 import type { EvalCase, CaseResult } from './types';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -38,10 +39,11 @@ async function main(): Promise<void> {
 
     const relevantSet = new Set(evalCase.relevantPmids.map(String));
 
-    // Time only the app pipeline, not the faithfulness judge
+    // Time only the app pipeline, not the faithfulness judge or rate-limit sleeps
+    takeRateLimitWaitMs();
     const start = Date.now();
     const ragResult = await runQuery(evalCase.question);
-    const latencyMs = Date.now() - start;
+    const latencyMs = Date.now() - start - takeRateLimitWaitMs();
 
     const retrievedPmids = ragResult.retrievedDocs.map((d) => d.pmid);
     const precision = precisionAtK(retrievedPmids, relevantSet);

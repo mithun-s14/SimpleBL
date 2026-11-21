@@ -22,14 +22,37 @@ const STOP_WORDS = new Set([
   'increase', 'improve', 'affect', 'impact', 'effect', 'benefit',
 ]);
 
+// Users and papers use different words for the same idea ("hypertrophy" vs
+// "muscle mass"). Each keyword found here is searched as an OR group of its synonyms.
+const SYNONYMS: Record<string, string[]> = {
+  hypertrophy: ['hypertrophy', '"muscle mass"', '"lean mass"', '"fat-free mass"', '"muscle growth"'],
+  muscle: ['muscle', 'muscular', '"skeletal muscle"'],
+  intake: ['intake', 'supplementation', 'ingestion', 'dietary'],
+  strength: ['strength', '"maximal strength"', '"one-repetition maximum"'],
+  power: ['power', '"power output"'],
+  endurance: ['endurance', 'aerobic', '"time trial"'],
+  recovery: ['recovery', '"muscle damage"', 'soreness'],
+  sleep: ['sleep', '"sleep deprivation"', '"sleep duration"'],
+  dose: ['dose', 'dosage', 'dose-response'],
+  fat: ['fat', 'adiposity', '"body fat"', '"fat mass"'],
+  weight: ['weight', '"body mass"'],
+};
+
 // Strip conversational language down to PubMed-friendly keywords
-function extractKeywords(query: string): string {
+function extractKeywords(query: string): string[] {
   const words = query
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
-  return words.slice(0, 7).join(' ');
+  return words.slice(0, 7);
+}
+
+// Turn keywords into PubMed syntax, e.g. protein AND (intake OR supplementation ...)
+function buildKeywordClause(keywords: string[]): string {
+  return keywords
+    .map((w) => (SYNONYMS[w] ? `(${SYNONYMS[w].join(' OR ')})` : w))
+    .join(' AND ');
 }
 
 const MAX_RESULTS = 8;
@@ -50,7 +73,7 @@ const STUDY_DESIGN_FILTER =
 
 // Narrow to human fitness science. Strict mode also requires a strong study design.
 function enhanceQuery(query: string, strict: boolean): string {
-  const keywords = extractKeywords(query);
+  const keywords = buildKeywordClause(extractKeywords(query));
   const base = `(${keywords}) AND ${DOMAIN_FILTER} AND ${HUMAN_FILTER}`;
   return strict ? `${base} AND ${STUDY_DESIGN_FILTER}` : base;
 }
