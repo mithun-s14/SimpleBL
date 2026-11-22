@@ -101,12 +101,12 @@ async function searchPmids(query: string): Promise<string[]> {
 // Decode common XML entities
 function decodeEntities(str: string): string {
   return str
+    .replace(/<[^>]+>/g, ' ')  // strip tags first, so decoded "<" / ">" in text survive
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/<[^>]+>/g, ' ')  // strip any remaining tags
     .replace(/\s+/g, ' ')
     .trim();
 }
