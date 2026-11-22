@@ -18,7 +18,7 @@ app.use(express.json());
 // Render sits behind one proxy; without this every request shares the proxy's IP.
 app.set('trust proxy', 1);
 // ponytail: in-memory per-IP store, resets on restart and isn't shared across instances; use a Redis store if scaled out.
-app.use('/api', rateLimit({ windowMs: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MIN) || 20, standardHeaders: 'draft-8', legacyHeaders: false }));
+app.use('/api', rateLimit({ windowMs: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MIN) || 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many requests, please try again in a minute.' } }));
 
 interface OpenRouterResponse {
   choices: Array<{ message: { content: string } }>;
