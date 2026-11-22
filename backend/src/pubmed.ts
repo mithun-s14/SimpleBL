@@ -20,6 +20,7 @@ const STOP_WORDS = new Set([
   // Vague qualifiers that add noise without search signal
   'optimal', 'best', 'good', 'ideal', 'better', 'effective', 'important',
   'increase', 'improve', 'affect', 'impact', 'effect', 'benefit',
+  'contribute', 'cause', 'lead', 'really', 'actually',
 ]);
 
 // Users and papers use different words for the same idea ("hypertrophy" vs
@@ -28,6 +29,7 @@ const SYNONYMS: Record<string, string[]> = {
   hypertrophy: ['hypertrophy', '"muscle mass"', '"lean mass"', '"fat-free mass"', '"muscle growth"'],
   muscle: ['muscle', 'muscular', '"skeletal muscle"'],
   intake: ['intake', 'supplementation', 'ingestion', 'dietary'],
+  consumption: ['consumption', 'intake', 'ingestion', 'dietary'],
   strength: ['strength', '"maximal strength"', '"one-repetition maximum"'],
   power: ['power', '"power output"'],
   endurance: ['endurance', 'aerobic', '"time trial"'],
@@ -42,6 +44,7 @@ const SYNONYMS: Record<string, string[]> = {
 function extractKeywords(query: string): string[] {
   const words = query
     .toLowerCase()
+    .replace(/\w+n['’]t\b/g, ' ') // drop negated contractions ("aren't" would leave "aren")
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
@@ -72,30 +75,39 @@ const STUDY_DESIGN_FILTER =
   '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR review[pt])';
 
 // Narrow to human fitness science. Strict mode also requires a strong study design.
-function enhanceQuery(query: string, strict: boolean): string {
-  const keywords = buildKeywordClause(extractKeywords(query));
-  const base = `(${keywords}) AND ${DOMAIN_FILTER} AND ${HUMAN_FILTER}`;
+function enhanceQuery(keywords: string[], strict: boolean): string {
+  const base = `(${buildKeywordClause(keywords)}) AND ${DOMAIN_FILTER} AND ${HUMAN_FILTER}`;
   return strict ? `${base} AND ${STUDY_DESIGN_FILTER}` : base;
 }
 
+const MIN_KEYWORDS = 2;
+
 // Strict search first (human + strong designs). If it comes back thin, fill the
 // remaining slots from the broader human-only search, without duplicates.
+// If nothing matches every keyword, drop trailing keywords and retry.
+// ponytail: assumes earlier words matter more; up to 2 extra NCBI calls per dropped word.
 async function searchPmids(query: string): Promise<string[]> {
-  const strict = await esearch(enhanceQuery(query, true));
-  console.log(`[pubmed] strict esearch returned ${strict.length} PMIDs`);
-  if (strict.length >= MIN_STRICT_RESULTS) return strict;
+  const keywords = extractKeywords(query);
+  for (let n = keywords.length; n >= Math.min(MIN_KEYWORDS, keywords.length); n--) {
+    const kw = keywords.slice(0, n);
+    if (n < keywords.length) await new Promise((r) => setTimeout(r, 340));
+    const strict = await esearch(enhanceQuery(kw, true));
+    console.log(`[pubmed] strict esearch (${kw.join(' ')}) returned ${strict.length} PMIDs`);
+    if (strict.length >= MIN_STRICT_RESULTS) return strict;
 
-  // Respect NCBI's 3 req/sec limit between calls
-  await new Promise((r) => setTimeout(r, 340));
-  const broad = await esearch(enhanceQuery(query, false));
-  console.log(`[pubmed] broad esearch returned ${broad.length} PMIDs`);
+    // Respect NCBI's 3 req/sec limit between calls
+    await new Promise((r) => setTimeout(r, 340));
+    const broad = await esearch(enhanceQuery(kw, false));
+    console.log(`[pubmed] broad esearch returned ${broad.length} PMIDs`);
 
-  const merged = [...strict];
-  for (const pmid of broad) {
-    if (merged.length >= MAX_RESULTS) break;
-    if (!merged.includes(pmid)) merged.push(pmid);
+    const merged = [...strict];
+    for (const pmid of broad) {
+      if (merged.length >= MAX_RESULTS) break;
+      if (!merged.includes(pmid)) merged.push(pmid);
+    }
+    if (merged.length > 0) return merged;
   }
-  return merged;
+  return [];
 }
 
 // Decode common XML entities

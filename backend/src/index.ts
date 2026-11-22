@@ -90,11 +90,14 @@ app.post('/api/search', async (req: Request, res: Response) => {
 
   // Fetch real PubMed abstracts — never throws, returns [] on failure
   const abstracts = await fetchPubMedAbstracts(trimmed);
-  const contextBlock = buildContextBlock(abstracts);
 
-  const systemPrompt = contextBlock
-    ? `${contextBlock}\n\n${SEARCH_SYSTEM_PROMPT}`
-    : SEARCH_SYSTEM_PROMPT;
+  // With no sources the model invents studies and citations, so don't ask it.
+  if (abstracts.length === 0) {
+    res.status(404).json({ error: 'No PubMed studies matched this question. Try rephrasing with fewer, more specific terms.' });
+    return;
+  }
+
+  const systemPrompt = `${buildContextBlock(abstracts)}\n\n${SEARCH_SYSTEM_PROMPT}`;
 
   try {
     const text = await callLLM([
