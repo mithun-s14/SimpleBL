@@ -74,6 +74,11 @@ app.post('/api/search', async (req: Request, res: Response) => {
     return;
   }
 
+  if (query.length > 500) {
+    res.status(400).json({ error: 'query must be 500 characters or fewer' });
+    return;
+  }
+
   const trimmed = query.trim();
 
   // Fetch real PubMed abstracts — never throws, returns [] on failure
