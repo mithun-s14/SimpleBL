@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import { rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fetchPubMedAbstracts, buildContextBlock, fetchArticleByPmid } from './pubmed';
@@ -10,8 +11,14 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://mithun-s14.github.io,http://localhost:5173').split(',');
+app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json());
+
+// Render sits behind one proxy; without this every request shares the proxy's IP.
+app.set('trust proxy', 1);
+// ponytail: in-memory per-IP store, resets on restart and isn't shared across instances; use a Redis store if scaled out.
+app.use('/api', rateLimit({ windowMs: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MIN) || 20, standardHeaders: 'draft-8', legacyHeaders: false }));
 
 interface OpenRouterResponse {
   choices: Array<{ message: { content: string } }>;
